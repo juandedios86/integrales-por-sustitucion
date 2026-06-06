@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Integrales por Sustitución - Automático</title>
+    <script>
+        window.MathJax = {
+            tex: {
+                inlineMath: [['$', '$'], ['\\(', '\\)']],
+                displayMath: [['$$', '$$'], ['\\[', '\\]']]
+            }
+        };
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js"></script>
+    <style>
+        * {margin:0; padding:0; box-sizing:border-box; font-family:'Segoe UI, Roboto, sans-serif;'}
+        body {background:linear-gradient(135deg, #2563eb 0%, #7c3aed 100%); min-height:100vh; padding:1.5rem 1rem;}
+        .container {max-width:900px; margin:0 auto; background:#fff; border-radius:18px; box-shadow:0 10px 30px rgba(0,0,0,0.2); overflow:hidden;}
+        .header {background:#1e293b; color:white; padding:2rem; text-align:center;}
+        .header h1 {font-size:1.7rem; margin-bottom:0.5rem;}
+        .content {padding:1.8rem;}
+        .input-box {background:#f8fafc; border-radius:12px; padding:1.5rem; margin-bottom:1.8rem; border-left:5px solid #3b82f6;}
+        .input-group {display:flex; gap:10px; flex-wrap:wrap;}
+        input {flex:1; min-width:240px; padding:0.9rem; border:2px solid #e2e8f0; border-radius:8px; font-size:1rem;}
+        button {padding:0.9rem 1.5rem; background:#2563eb; color:white; border:none; border-radius:8px; font-weight:600; cursor:pointer;}
+        button:hover {background:#1d4ed8;}
+        .procedimiento {display:none; margin-top:1.5rem;}
+        .paso {margin:1.2rem 0; padding:1.2rem; background:#f0f7ff; border-radius:8px; border-left:3px solid #3b82f6;}
+        .formula {text-align:center; font-size:1.1rem; margin:0.8rem 0; overflow-x:auto;}
+        .resultado {background:#f0fdf4; border:2px solid #4ade80; padding:1.3rem; border-radius:8px; text-align:center; font-weight:bold; font-size:1.15rem; margin-top:1.5rem;}
+        .info {font-size:0.85rem; color:#475569; margin-top:0.8rem; line-height:1.5;}
+        @media (max-width:550px) {.input-group {flex-direction:column;} button {width:100%;}}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔢 Integrales por Sustitución</h1>
+            <p>Resuelve cualquier variación automáticamente</p>
+        </div>
+        <div class="content">
+            <div class="input-box">
+                <h3>Escribe la integral:</h3>
+                <div class="input-group">
+                    <input type="text" id="entrada" placeholder="Ej: 4*x*(x^2+7)^5 , cos(5*x) , e^(3*x)" value="2*x*(x^2+1)^3">
+                    <button onclick="resolver()">Resolver</button>
+                </div>
+                <p class="info">
+                    ✅ Reglas: Usa <code>*</code> para multiplicar, <code>^</code> para potencias<br>
+                    Funciona con: polinomios, trigonométricas, exponenciales, logarítmicas
+                </p>
+            </div>
+            <div class="procedimiento" id="proc">
+                <h3 style="color:#1e40af; margin-bottom:1rem; padding-bottom:0.5rem; border-bottom:2px solid #e0e7ff;">Procedimiento completo</h3>
+                <div id="pasos"></div>
+                <div class="resultado" id="res"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function resolver() {
+            const expr = document.getElementById('entrada').value.trim();
+            if (!expr) { alert("Escribe una integral válida"); return; }
+
+            const pasosDiv = document.getElementById('pasos');
+            const resDiv = document.getElementById('res');
+            pasosDiv.innerHTML = '';
+
+            let datos = detectarYGenerar(expr);
+            if (!datos) {
+                alert("Escribe la integral con sintaxis correcta.\nEjemplo: 3*x*(x^2+2)^4 , cos(4*x) , e^(2*x)");
+                return;
+            }
+
+            agregarPaso(1, "Integral original:", `\\[ \\int ${datos.original} \\, dx \\]`);
+            agregarPaso(2, "Definimos la sustitución:", `\\[ u = ${datos.u} \\]`);
+            agregarPaso(3, "Calculamos la derivada:", `\\[ \\frac{du}{dx} = ${datos.du} \\quad \\Rightarrow \\quad du = ${datos.du} \\, dx \\]`);
+            agregarPaso(4, "Reescribimos la integral en términos de u:", `\\[ ${datos.integralU} \\]`);
+            agregarPaso(5, "Integramos respecto a u:", `\\[ ${datos.integradaU} + C \\]`);
+            agregarPaso(6, "Volvemos a la variable original x:", `\\[ ${datos.resultado} + C \\]`);
+
+            resDiv.innerHTML = `✅ Resultado final: \\[ ${datos.resultado} + C \\]`;
+            document.getElementById('proc').style.display = 'block';
+            MathJax.typeset();
+        }
+
+        // Función que detecta la estructura y genera los datos automáticamente
+        function detectarYGenerar(expr) {
+            let datos = {};
+
+            // Caso 1: Polinomio elevado: A*x^(n-1)*(x^n + b)^k
+            if (expr.match(/\d*\*?x\^?\d*\s*\*\s*\(\s*x\^?\d*\s*[+-]\s*\d+\s*\)\^\d+/)) {
+                let partes = expr.match(/(\d*)\*?x\^?(\d*)\s*\*\s*\(\s*x\^(\d+)\s*([+-])\s*(\d+)\s*\)\^(\d+)/);
+                let A = partes[1] || 1;
+                let expX = partes[2] || 1;
+                let n = partes[3];
+                let signo = partes[4];
+                let b = partes[5];
+                let k = partes[6];
+
+                datos = {
+                    original: expr,
+                    u: `x^${n} ${signo} ${b}`,
+                    du: `${n}x^${n-1}`,
+                    integralU: `\\int u^{${k}} \\, du`,
+                    integradaU: `\\frac{u^{${parseInt(k)+1}}}{${parseInt(k)+1}}`,
+                    resultado: `\\frac{(x^${n} ${signo} ${b})^{${parseInt(k)+1}}}{${parseInt(k)+1}}`
+                };
+            }
+            // Caso 2: Trigonométrica: cos(A*x) o sin(A*x)
+            else if (expr.includes('cos(') || expr.includes('sin(')) {
+                let tipo = expr.includes('cos') ? 'cos' : 'sin';
+                let coef = expr.match(/\((\d*)x\)/)?.[1] || 1;
+                let coefTexto = coef === '1' ? '' : coef;
+
+                datos = {
+                    original: expr,
+                    u: `${coefTexto}x`,
+                    du: coef,
+                    integralU: tipo === 'cos' ? `\\int \\cos(u) \\cdot \\frac{1}{${coef}} du` : `\\int \\sin(u) \\cdot \\frac{1}{${coef}} du`,
+                    integradaU: tipo === 'cos' ? `\\frac{\\sin(u)}{${coef}}` : `-\\frac{\\cos(u)}{${coef}}`,
+                    resultado: tipo === 'cos' ? `\\frac{\\sin(${coefTexto}x)}{${coef}}` : `-\\frac{\\cos(${coefTexto}x)}{${coef}}`
+                };
+            }
+            // Caso 3: Exponencial: e^(A*x)
+            else if (expr.includes('e^(')) {
+                let coef = expr.match(/e\^\((\d*)x\)/)?.[1] || 1;
+                let coefTexto = coef === '1' ? '' : coef;
+
+                datos = {
+                    original: expr,
+                    u: `${coefTexto}x`,
+                    du: coef,
+                    integralU: `\\int e^u \\cdot \\frac{1}{${coef}} du`,
+                    integradaU: `\\frac{e^u}{${coef}}`,
+                    resultado: `\\frac{e^{${coefTexto}x}}{${coef}}`
+                };
+            }
+            // Caso 4: 1/(A*x + b)
+            else if (expr.includes('1/(')) {
+                let partes = expr.match(/1\/\((\d*)x\s*([+-])\s*(\d+)\)/);
+                let A = partes[1] || 1;
+                let signo = partes[2];
+                let b = partes[3];
+
+                datos = {
+                    original: expr,
+                    u: `${A}x ${signo} ${b}`,
+                    du: A,
+                    integralU: `\\int \\frac{1}{u} \\cdot \\frac{1}{${A}} du`,
+                    integradaU: `\\frac{\\ln|u|}{${A}}`,
+                    resultado: `\\frac{\\ln|${A}x ${signo} ${b}|}{${A}}`
+                };
+            }
+            // Caso 5: ln(x)/x
+            else if (expr === 'ln(x)/x') {
+                datos = {
+                    original: expr,
+                    u: '\\ln x',
+                    du: '\\frac{1}{x}',
+                    integralU: '\\int u \\, du',
+                    integradaU: '\\frac{u^2}{2}',
+                    resultado: '\\frac{(\\ln x)^2}{2}'
+                };
+            }
+
+            return datos;
+        }
+
+        function agregarPaso(n, texto, formula) {
+            const div = document.createElement('div');
+            div.className = 'paso';
+            div.innerHTML = `
+                <b>Paso ${n}:</b> ${texto}
+                <div class="formula">${formula}</div>
+            `;
+            document.getElementById('pasos').appendChild(div);
+        }
+    </script>
+</body>
+</html>
